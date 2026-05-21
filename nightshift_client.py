@@ -7,6 +7,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+_TERMINAL_STATUSES = {"cancelled", "completed", "accepted", "in_progress", "closed", "rejected"}
+
 
 class NightshiftClient:
     """Thin wrapper around the Nightshift AGI job marketplace API."""
@@ -29,15 +31,27 @@ class NightshiftClient:
 
     def list_open_jobs(self) -> list[dict[str, Any]]:
         """Return all currently open jobs, or [] on error."""
-        url = f"{self.base_url}/api/v1/jobs?status=open"
+        url = f"{self.base_url}/api/v1/jobs"
         try:
             resp = self._session.get(url, timeout=15)
             resp.raise_for_status()
             data = resp.json()
             # API may return a list directly or {"jobs": [...]}
             if isinstance(data, list):
-                return data
-            return data.get("jobs", data.get("data", []))
+                jobs = data
+            else:
+                jobs = data.get("jobs", data.get("data", []))
+            # Filter client-side since the API status query param is unreliable
+            available = [j for j in jobs if j.get("status") not in _TERMINAL_STATUSES]
+            logger.info("Fetched %d job(s), %d available.", len(jobs), len(available))
+            return available
+        except requests.HTTPError as exc:
+            logger.error(
+                "list_open_jobs failed: %s — body: %s",
+                exc,
+                exc.response.text[:500] if exc.response is not None else "n/a",
+            )
+            return []
         except requests.RequestException as exc:
             logger.error("list_open_jobs failed: %s", exc)
             return []

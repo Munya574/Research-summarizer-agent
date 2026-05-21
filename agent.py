@@ -107,13 +107,13 @@ def main() -> None:
     while True:
         try:
             _poll_once(client, seen_ids, api_key)
+            time.sleep(POLL_INTERVAL)
         except KeyboardInterrupt:
             logger.info("Stopped by user.")
             break
         except Exception as exc:  # noqa: BLE001
             logger.error("Unhandled error in poll loop: %s", exc, exc_info=True)
-
-        time.sleep(POLL_INTERVAL)
+            time.sleep(POLL_INTERVAL)
 
 
 def _poll_once(client: NightshiftClient, seen_ids: set[str], api_key: str) -> None:

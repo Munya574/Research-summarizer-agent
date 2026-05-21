@@ -1,9 +1,11 @@
-"""Main polling loop — ties NightshiftClient and summarizer together."""
+"""Main polling loop - ties NightshiftClient and summarizer together."""
 
 import logging
 import os
+import threading
 import time
 
+import flask
 from dotenv import load_dotenv
 
 from nightshift_client import NightshiftClient
@@ -18,9 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agent")
 
-# ------------------------------------------------------------------
 # Configuration
-# ------------------------------------------------------------------
 
 RESEARCH_KEYWORDS = frozenset(
     {"summarize", "summary", "paper", "arxiv", "research", "article", "study", "abstract"}
@@ -29,9 +29,7 @@ MAX_JOBS_PER_CYCLE = 3   # free-tier cap: process at most 3 per poll cycle
 POLL_INTERVAL = 30       # seconds between polls (~30 req/min guard)
 
 
-# ------------------------------------------------------------------
 # Helpers
-# ------------------------------------------------------------------
 
 def _is_research_job(job: dict) -> bool:
     text = f"{job.get('title', '')} {job.get('description', '')}".lower()
@@ -79,10 +77,22 @@ def _fail(client: NightshiftClient, job_id: str, reason: str) -> None:
     logger.error("[%s] %s", job_id, reason)
     client.submit_proof(job_id, f"Error: {reason}")
 
-
-# ------------------------------------------------------------------
 # Entry point
-# ------------------------------------------------------------------
+
+def _start_health_server() -> None:
+    port = int(os.environ.get("PORT", 8080))
+    app = flask.Flask(__name__)
+    log = logging.getLogger("werkzeug")
+    log.setLevel(logging.ERROR)  # silence Flask request logs
+
+    @app.get("/")
+    def health():
+        return flask.jsonify({"status": "running", "agent": "research-summarizer"})
+
+    thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True)
+    thread.start()
+    logger.info("Health check server listening on port %d", port)
+
 
 def main() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -97,6 +107,8 @@ def main() -> None:
     }.items() if not v]
     if missing:
         raise SystemExit(f"Missing required env vars: {', '.join(missing)}")
+
+    _start_health_server()
 
     client = NightshiftClient(base_url, session_cookie, profile_id)
     seen_ids: set[str] = set()

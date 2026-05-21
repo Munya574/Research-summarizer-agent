@@ -25,9 +25,7 @@ class NightshiftClient:
             }
         )
 
-    # ------------------------------------------------------------------
     # Public API
-    # ------------------------------------------------------------------
 
     def list_open_jobs(self) -> list[dict[str, Any]]:
         """Return all currently open jobs, or [] on error."""

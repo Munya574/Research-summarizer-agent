@@ -112,9 +112,7 @@ def summarize_paper(content: str, title: str = "", api_key: str | None = None) -
     return response.content[0].text
 
 
-# ------------------------------------------------------------------
 # Helpers
-# ------------------------------------------------------------------
 
 def _normalise_arxiv_url(url: str) -> str:
     """Convert arXiv PDF URLs to the abstract (HTML) page."""
